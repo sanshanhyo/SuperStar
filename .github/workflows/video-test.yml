@@ -1,0 +1,42 @@
+name: SuperStar video test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  video-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CHAOXING_USERNAME: ${{ secrets.CHAOXING_USERNAME }}
+      CHAOXING_PASSWORD: ${{ secrets.CHAOXING_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check --no-input -r requirements.txt
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          test -n "$CHAOXING_USERNAME" || { echo "CHAOXING_USERNAME is not configured"; exit 1; }
+          test -n "$CHAOXING_PASSWORD" || { echo "CHAOXING_PASSWORD is not configured"; exit 1; }
+
+      - name: Render runtime config
+        run: python scripts/render_config.py --template config_template.ini --output config.ini
+
+      - name: Run one-video test
+        run: python scripts/video_test.py --config config.ini
+
+      - name: Remove runtime credentials and logs
+        if: always()
+        run: rm -f config.ini cookies.txt chaoxing.log
