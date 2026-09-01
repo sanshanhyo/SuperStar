@@ -338,7 +338,18 @@ class Chaoxing:
         logger.info("课程章节读取成功...")
         return decode_course_point(_resp.text)
 
-    def get_job_list(self, course: dict, point: dict) -> tuple[list[dict], dict]:
+    def get_job_list(
+        self,
+        course: dict,
+        point: dict,
+        report_empty_page: bool = True,
+    ) -> tuple[list[dict], dict]:
+        """Read a chapter's task cards.
+
+        ``report_empty_page`` preserves the historical behavior by default.
+        Read-only probes can disable the fallback request that marks an empty
+        page as completed.
+        """
         _session = SessionManager.get_session()
         self.rate_limiter.limit_rate()
         job_list = []
@@ -374,7 +385,7 @@ class Chaoxing:
             job_list += _job_list
             job_info.update(_job_info)
 
-        if not job_list:
+        if not job_list and report_empty_page:
             self.study_emptypage(course, point)
 
         logger.trace(f"原始任务点列表内容:\n{_resp.text}")

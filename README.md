@@ -25,6 +25,28 @@
 
 <a href="https://github.com/Samueli924/chaoxing" target="blank">灵感来源</a>
 
+## GitHub Actions 最小测试
+
+本仓库的 Actions 仅提供一个手动触发的只读 smoke test，固定检查
+`courseId=266120241`、`clazzId=152038953`。它验证登录、课程识别、少量章节读取、
+任务类型解析和日志输出，不会执行视频、文档、答题、签到或提交操作，也不会跑完整门课。
+
+先在 fork 后的仓库中设置以下 Actions Secrets：
+
+- `CHAOXING_USERNAME`：学习通手机号账号
+- `CHAOXING_PASSWORD`：学习通密码
+
+运行时脚本从 `config_template.ini` 生成被 `.gitignore` 忽略的 `config.ini`，凭据不会写入提交。
+在 GitHub 的 `Actions` 页面选择 `SuperStar course smoke test`，点击 `Run workflow` 手动运行。
+
+成功日志会依次出现 `[smoke] login check passed`、`[smoke] course identification passed`、
+`[smoke] chapter identification passed`、`[smoke] task-card identification passed` 和
+`[smoke] SUCCESS: read-only checks completed`。课程或班级不匹配、登录失败、章节响应无法解析，
+都会使 workflow 失败。
+
+如果 `type_counts={}`，表示本次抽样章节都是已完成或未开放状态，卡片接口仍然可读，但没有可展示的未完成任务类型；
+这不等同于整门课已执行。
+
 ## 赞助
 >如果觉着代码对你有帮助，可以赞赏一下开发者
 
