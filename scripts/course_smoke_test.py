@@ -5,8 +5,15 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import sys
 from collections import Counter
 from pathlib import Path
+
+# When this file is executed as ``python scripts/course_smoke_test.py``,
+# Python puts scripts/ (rather than the repository root) on sys.path.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from api.base import Account, Chaoxing
 from api.logger import configure_console_logger, logger
