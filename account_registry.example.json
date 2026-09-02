@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "accounts": {
+    "A": {
+      "username": "REPLACE_WITH_ACCOUNT_A_USERNAME",
+      "password": "REPLACE_WITH_ACCOUNT_A_PASSWORD",
+      "courses": {
+        "266120241": {
+          "clazz_id": "152038953"
+        }
+      }
+    },
+    "B": {
+      "username": "REPLACE_WITH_ACCOUNT_B_USERNAME",
+      "password": "REPLACE_WITH_ACCOUNT_B_PASSWORD",
+      "courses": {
+        "266120241": {
+          "clazz_id": "152038953"
+        }
+      }
+    }
+  }
+}

@@ -9,6 +9,11 @@ import math
 import os
 from pathlib import Path
 
+try:
+    from scripts.account_registry import AccountRegistryError, resolve_account
+except ModuleNotFoundError:
+    from account_registry import AccountRegistryError, resolve_account
+
 
 COURSE_ID = "266120241"
 DEFAULT_TIKU_API_ENDPOINT = "https://api.shenwenai.com/v1"
@@ -23,6 +28,13 @@ def required_secret(name: str) -> str:
         raise SystemExit(f"missing required environment variable: {name}")
     if "\r" in value or "\n" in value:
         raise SystemExit(f"environment variable {name} must not contain a newline")
+    return value
+
+
+def required_account_registry() -> str:
+    value = os.environ.get("SUPERSTAR_ACCOUNTS_JSON", "")
+    if not value:
+        raise SystemExit("missing required environment variable: SUPERSTAR_ACCOUNTS_JSON")
     return value
 
 
@@ -46,6 +58,21 @@ def main() -> None:
         default=MIN_VIDEO_SPEED,
         help="video speed from 1.0 to 2.0",
     )
+    parser.add_argument(
+        "--account-id",
+        default="",
+        help="account alias in SUPERSTAR_ACCOUNTS_JSON",
+    )
+    parser.add_argument(
+        "--course-id",
+        default=COURSE_ID,
+        help="course ID registered for the selected account",
+    )
+    parser.add_argument(
+        "--clazz-id",
+        default="",
+        help="optional class ID; required when the account has multiple classes",
+    )
     args = parser.parse_args()
     if args.submit and not args.enable_ai:
         raise SystemExit("--submit requires --enable-ai")
@@ -57,8 +84,24 @@ def main() -> None:
             f"--speed must be between {MIN_VIDEO_SPEED} and {MAX_VIDEO_SPEED}"
         )
 
-    username = required_secret("CHAOXING_USERNAME")
-    password = required_secret("CHAOXING_PASSWORD")
+    course_id = args.course_id.strip()
+    if not course_id:
+        raise SystemExit("--course-id must not be empty")
+
+    if args.account_id.strip():
+        try:
+            username, password, clazz_id = resolve_account(
+                required_account_registry(),
+                args.account_id.strip(),
+                course_id,
+                args.clazz_id,
+            )
+        except AccountRegistryError as exc:
+            raise SystemExit(str(exc)) from exc
+    else:
+        username = required_secret("CHAOXING_USERNAME")
+        password = required_secret("CHAOXING_PASSWORD")
+        clazz_id = args.clazz_id.strip()
 
     config = configparser.ConfigParser(interpolation=None)
     if not config.read(args.template, encoding="utf-8"):
@@ -72,7 +115,9 @@ def main() -> None:
     common["username"] = username
     common["password"] = password
     # This is deliberately fixed so a manual run cannot broaden the scope.
-    common["course_list"] = COURSE_ID
+    common["course_list"] = course_id
+    common["target_course_id"] = course_id
+    common["target_clazz_id"] = clazz_id
     common["speed"] = f"{args.speed:g}"
     common["jobs"] = "1"
     common["notopen_action"] = "continue"

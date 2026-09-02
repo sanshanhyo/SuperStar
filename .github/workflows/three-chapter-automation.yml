@@ -3,10 +3,45 @@ name: SuperStar three-chapter automation
 on:
   workflow_dispatch:
     inputs:
+      account_id:
+        description: "账号别名，对应 SUPERSTAR_ACCOUNTS_JSON 中的账号"
+        required: true
+        default: "A"
+        type: string
+      course_id:
+        description: "课程 ID，必须已登记在所选账号下"
+        required: true
+        default: "266120241"
+        type: string
+      clazz_id:
+        description: "可选班级 ID；同一课程有多个班级时必须填写"
+        required: false
+        default: ""
+        type: string
       chapter_selection:
         description: "章节顺序号，留空则自动选择前三个未完成章节，例如 4,5,6"
         required: false
         default: ""
+        type: string
+      chapter_plan:
+        description: "批次链，分号分隔，例如 4,5,6;7,8,9;10,11,12；与章节顺序号二选一"
+        required: false
+        default: ""
+        type: string
+      auto_continue:
+        description: "自动连续处理未完成章节；成功后自动启动下一次 Action"
+        required: true
+        default: false
+        type: boolean
+      start_chapter:
+        description: "自动续跑起始章节顺序号，默认从第 1 章检查"
+        required: false
+        default: "1"
+        type: string
+      end_chapter:
+        description: "自动续跑结束章节顺序号；填写 0 表示一直到最后"
+        required: false
+        default: "0"
         type: string
       video_speed:
         description: "视频倍速，允许范围 1.0 到 2.0"
@@ -16,14 +51,22 @@ on:
 
 permissions:
   contents: read
+  actions: write
+
+concurrency:
+  # Prevent duplicate work for the same account/course/selection while
+  # allowing different accounts or non-overlapping chapter ranges to run together.
+  group: >-
+    ${{ github.workflow }}-${{ inputs.account_id }}-${{ inputs.course_id }}-
+    ${{ inputs.clazz_id || 'auto' }}-${{ inputs.chapter_selection || 'auto' }}
+  cancel-in-progress: false
 
 jobs:
   three-chapter-automation:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      CHAOXING_USERNAME: ${{ secrets.CHAOXING_USERNAME }}
-      CHAOXING_PASSWORD: ${{ secrets.CHAOXING_PASSWORD }}
+      SUPERSTAR_ACCOUNTS_JSON: ${{ secrets.SUPERSTAR_ACCOUNTS_JSON }}
       TIKU_API_KEY: ${{ secrets.TIKU_API_KEY }}
       TIKU_API_ENDPOINT: https://api.shenwenai.com
       TIKU_API_MODEL: gpt-5.6-luna
@@ -42,24 +85,73 @@ jobs:
       - name: Validate required secrets
         shell: bash
         run: |
-          test -n "$CHAOXING_USERNAME" || { echo "CHAOXING_USERNAME is not configured"; exit 1; }
-          test -n "$CHAOXING_PASSWORD" || { echo "CHAOXING_PASSWORD is not configured"; exit 1; }
+          test -n "$SUPERSTAR_ACCOUNTS_JSON" || { echo "SUPERSTAR_ACCOUNTS_JSON is not configured"; exit 1; }
           test -n "$TIKU_API_KEY" || { echo "TIKU_API_KEY is not configured"; exit 1; }
 
       - name: Render submit-enabled runtime config
+        env:
+          INPUT_ACCOUNT_ID: ${{ inputs.account_id }}
+          INPUT_COURSE_ID: ${{ inputs.course_id }}
+          INPUT_CLAZZ_ID: ${{ inputs.clazz_id }}
+          INPUT_VIDEO_SPEED: ${{ inputs.video_speed }}
         run: >
           python scripts/render_config.py
           --template config_template.ini
           --output config.ini
           --enable-ai
           --submit
-          --speed "${{ inputs.video_speed }}"
+          --account-id "$INPUT_ACCOUNT_ID"
+          --course-id "$INPUT_COURSE_ID"
+          --clazz-id "$INPUT_CLAZZ_ID"
+          --speed "$INPUT_VIDEO_SPEED"
+
+      - name: Prepare chapter batch
+        id: chapter_plan
+        env:
+          INPUT_CHAPTER_PLAN: ${{ inputs.chapter_plan }}
+          INPUT_CHAPTER_SELECTION: ${{ inputs.chapter_selection }}
+          INPUT_AUTO_CONTINUE: ${{ inputs.auto_continue }}
+        run: >
+          python scripts/chapter_plan.py
+          --plan "$INPUT_CHAPTER_PLAN"
+          --selection "$INPUT_CHAPTER_SELECTION"
+          --auto-continue "$INPUT_AUTO_CONTINUE"
 
       - name: Process selected chapters serially
+        id: process_chapters
+        env:
+          INPUT_COURSE_ID: ${{ inputs.course_id }}
+          INPUT_CLAZZ_ID: ${{ inputs.clazz_id }}
+          INPUT_CHAPTER_SELECTION: ${{ steps.chapter_plan.outputs.current_selection }}
+          INPUT_AUTO_CONTINUE: ${{ inputs.auto_continue }}
+          INPUT_START_CHAPTER: ${{ inputs.start_chapter }}
+          INPUT_END_CHAPTER: ${{ inputs.end_chapter }}
         run: >
           python scripts/three_chapter_automation.py
           --config config.ini
-          --chapter-selection "${{ inputs.chapter_selection }}"
+          --course-id "$INPUT_COURSE_ID"
+          --clazz-id "$INPUT_CLAZZ_ID"
+          --chapter-selection "$INPUT_CHAPTER_SELECTION"
+          --auto-continue "$INPUT_AUTO_CONTINUE"
+          --start-chapter "$INPUT_START_CHAPTER"
+          --end-chapter "$INPUT_END_CHAPTER"
+
+      - name: Dispatch next chapter batch
+        if: >-
+          ${{ success() &&
+          (steps.chapter_plan.outputs.remaining_plan != '' ||
+          steps.process_chapters.outputs.continue_required == 'true') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REMAINING_PLAN: ${{ steps.chapter_plan.outputs.remaining_plan }}
+          CONTINUE_REQUIRED: ${{ steps.process_chapters.outputs.continue_required }}
+          INPUT_ACCOUNT_ID: ${{ inputs.account_id }}
+          INPUT_COURSE_ID: ${{ inputs.course_id }}
+          INPUT_CLAZZ_ID: ${{ inputs.clazz_id }}
+          INPUT_END_CHAPTER: ${{ inputs.end_chapter }}
+          NEXT_START_CHAPTER: ${{ steps.process_chapters.outputs.next_start_chapter }}
+          INPUT_VIDEO_SPEED: ${{ inputs.video_speed }}
+        run: python scripts/dispatch_next_chapter_batch.py
 
       - name: Remove runtime credentials and logs
         if: always()
