@@ -38,6 +38,7 @@
 
 运行时脚本从 `config_template.ini` 生成被 `.gitignore` 忽略的 `config.ini`，凭据不会写入提交。
 在 GitHub 的 `Actions` 页面选择 `SuperStar course smoke test`，点击 `Run workflow` 手动运行。
+启动时选择要检查的章节数（1-3），并勾选只读确认项；未勾选时 workflow 会直接停止。
 
 成功日志会依次出现 `[smoke] login check passed`、`[smoke] course identification passed`、
 `[smoke] chapter identification passed`、`[smoke] task-card identification passed` 和

@@ -2,6 +2,21 @@ name: SuperStar course smoke test
 
 on:
   workflow_dispatch:
+    inputs:
+      max_chapters:
+        description: "要检查的前几个章节"
+        required: true
+        default: "3"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+      confirm_read_only:
+        description: "确认只读检查，不学习、不答题、不签到、不提交"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -31,11 +46,17 @@ jobs:
           test -n "$CHAOXING_USERNAME" || { echo "CHAOXING_USERNAME is not configured"; exit 1; }
           test -n "$CHAOXING_PASSWORD" || { echo "CHAOXING_PASSWORD is not configured"; exit 1; }
 
+      - name: Confirm read-only mode
+        if: ${{ inputs.confirm_read_only != true }}
+        run: |
+          echo "请在 Run workflow 页面勾选只读确认项"
+          exit 1
+
       - name: Render runtime config
         run: python scripts/render_config.py --template config_template.ini --output config.ini
 
       - name: Run read-only course smoke test
-        run: python scripts/course_smoke_test.py --config config.ini --max-chapters 3
+        run: python scripts/course_smoke_test.py --config config.ini --max-chapters "${{ inputs.max_chapters }}"
 
       - name: Remove runtime credentials and logs
         if: always()
