@@ -1,0 +1,71 @@
+name: Manage Superstar account
+
+on:
+  workflow_dispatch:
+    inputs:
+      encrypted_payload:
+        description: "由本地 account_payload.py 生成的密文，不要填写明文密码"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  update-account-registry:
+    runs-on: ubuntu-latest
+    env:
+      SUPERSTAR_ACCOUNTS_JSON: ${{ secrets.SUPERSTAR_ACCOUNTS_JSON }}
+      SUPERSTAR_ACCOUNT_PRIVATE_KEY: ${{ secrets.SUPERSTAR_ACCOUNT_PRIVATE_KEY }}
+      GH_TOKEN: ${{ secrets.SUPERSTAR_ADMIN_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate management token
+        run: >-
+          test -n "$GH_TOKEN" || {
+            echo "SUPERSTAR_ADMIN_TOKEN is not configured";
+            exit 1;
+          }
+
+      - name: Validate account private key
+        run: >-
+          test -n "$SUPERSTAR_ACCOUNT_PRIVATE_KEY" || {
+            echo "SUPERSTAR_ACCOUNT_PRIVATE_KEY is not configured";
+            exit 1;
+          }
+
+      - name: Mask encrypted input
+        env:
+          INPUT_ENCRYPTED_PAYLOAD: ${{ inputs.encrypted_payload }}
+        run: |
+          printf '::add-mask::%s\n' "$INPUT_ENCRYPTED_PAYLOAD"
+
+      - name: Merge account into registry
+        env:
+          INPUT_ENCRYPTED_PAYLOAD: ${{ inputs.encrypted_payload }}
+          REGISTRY_FILE: ${{ runner.temp }}/superstar-account-registry.json
+        run: >-
+          python scripts/manage_account_registry.py
+          --encrypted-payload "$INPUT_ENCRYPTED_PAYLOAD"
+          --output "$REGISTRY_FILE"
+
+      - name: Encrypt and update repository secret
+        env:
+          REGISTRY_FILE: ${{ runner.temp }}/superstar-account-registry.json
+        run: >-
+          gh secret set SUPERSTAR_ACCOUNTS_JSON
+          --repo "$GITHUB_REPOSITORY"
+          < "$REGISTRY_FILE"
+
+      - name: Remove temporary account data
+        if: always()
+        env:
+          REGISTRY_FILE: ${{ runner.temp }}/superstar-account-registry.json
+        run: rm -f "$REGISTRY_FILE"

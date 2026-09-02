@@ -29,6 +29,8 @@
 
 三章节自动化工作流支持选择账号、课程、章节顺序和视频倍速。账号凭据不放在工作流输入中，使用一个仓库 Secret `SUPERSTAR_ACCOUNTS_JSON` 保存账号注册表；账号别名和课程配置使用 [account_registry.example.json](account_registry.example.json) 作为格式模板。
 
+仓库还提供 `Manage Superstar account` 管理工作流。它可以读取现有注册表、合并新账号或更新已有账号，不需要手动重新编辑整个 `SUPERSTAR_ACCOUNTS_JSON`。为了让仓库保持公开，这个工作流只接受本地工具生成的加密账号资料，不接受明文用户名和密码。
+
 将填好但未提交的注册表作为 `SUPERSTAR_ACCOUNTS_JSON` Secret 保存后，在 `SuperStar three-chapter automation` 的 `Run workflow` 页面填写：
 
 - `account_id`：注册表中的账号别名，例如 `A`
@@ -46,6 +48,26 @@
 `chapter_plan` 和 `chapter_selection` 只能填写一个。批次链中的每一批最多三个章节，某一批失败后不会继续派发后续批次；工作流需要 `actions: write` 权限来启动下一次运行。
 
 如果打开 `auto_continue`，请不要填写 `chapter_plan` 或 `chapter_selection`。例如设置 `start_chapter=4`、`end_chapter=12`，工作流会从第 4 个章节顺序开始，跳过已完成章节，每次处理最多三个未完成章节，直到第 12 个章节；设置 `end_chapter=0` 则一直处理到课程末尾。
+
+### 通过管理工作流添加账号
+
+首次使用前，在仓库的 `Settings` → `Secrets and variables` → `Actions` 中新增一个 `SUPERSTAR_ADMIN_TOKEN`。它应当是只允许访问本仓库、且仅授予 `Secrets: write` 权限的 fine-grained personal access token。这个 Token 只用于让管理工作流更新 `SUPERSTAR_ACCOUNTS_JSON`，不要提交到仓库。
+
+首次使用还需要生成一对本地密钥。在仓库目录运行：
+
+```bash
+uv run --with PyNaCl python scripts/account_payload.py generate-key
+```
+
+将 `superstar-account-private-key.txt` 的内容保存为仓库 Secret `SUPERSTAR_ACCOUNT_PRIVATE_KEY`。私钥只保存到 Secret 和你自己的本地安全位置，不要提交；公钥文件也只在本地使用即可。
+
+以后新增账号时，在仓库目录运行：
+
+```bash
+uv run --with PyNaCl python scripts/account_payload.py encrypt
+```
+
+工具会交互式询问账号别名、用户名、密码、课程 ID 和班级 ID，并只输出一行密文。然后进入 `Actions` → `Manage Superstar account` → `Run workflow`，把这一行粘贴到 `encrypted_payload`，其余输入保持默认。账号别名已存在时会更新该账号，并保留它已经登记的其他课程。Workflow 输入中只有密文，不包含明文密码。
 
 ## 赞助
 >如果觉着代码对你有帮助，可以赞赏一下开发者

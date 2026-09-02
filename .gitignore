@@ -110,6 +110,8 @@ ENV/
 env.bak/
 venv.bak/
 account_registry.json
+superstar-account-private-key.txt
+superstar-account-public-key.txt
 
 # Spyder project settings
 .spyderproject
