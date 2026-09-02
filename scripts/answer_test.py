@@ -59,6 +59,8 @@ def find_target_course(chaoxing: Chaoxing) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--point-id", default=POINT_ID)
+    parser.add_argument("--point-title", default=POINT_TITLE)
     parser.add_argument(
         "--allow-submit",
         action="store_true",
@@ -96,8 +98,8 @@ def main() -> int:
         "[answer-test] scope locked to courseId={} clazzId={} pointId={} title={!r}",
         COURSE_ID,
         CLAZZ_ID,
-        POINT_ID,
-        POINT_TITLE,
+        args.point_id,
+        args.point_title,
     )
     logger.info(
         "[answer-test] submit={}: {}",
@@ -146,12 +148,13 @@ def main() -> int:
     target_points = [
         point
         for point in points
-        if str(point.get("id")) == POINT_ID and point.get("title") == POINT_TITLE
+        if str(point.get("id")) == args.point_id
+        and point.get("title") == args.point_title
     ]
     if len(target_points) != 1:
         raise RuntimeError(
-            f"target chapter not found exactly once: pointId={POINT_ID}, "
-            f"title={POINT_TITLE!r}, matches={len(target_points)}"
+            f"target chapter not found exactly once: pointId={args.point_id}, "
+            f"title={args.point_title!r}, matches={len(target_points)}"
         )
     point = target_points[0]
 

@@ -39,7 +39,9 @@ jobs:
         run: python scripts/render_config.py --template config_template.ini --output config.ini --enable-ai --submit
 
       - name: Run one-quiz submit test
-        run: python scripts/answer_test.py --config config.ini --allow-submit
+        run: >-
+          python scripts/answer_test.py --config config.ini --allow-submit
+          --point-id 1221167830 --point-title '1.2 国防的职能与使命【上】'
 
       - name: Remove runtime credentials and logs
         if: always()
