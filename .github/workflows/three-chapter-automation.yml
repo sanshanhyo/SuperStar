@@ -2,6 +2,12 @@ name: SuperStar three-chapter automation
 
 on:
   workflow_dispatch:
+    inputs:
+      chapter_selection:
+        description: "章节顺序号，留空则自动选择前三个未完成章节，例如 4,5,6"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -38,8 +44,11 @@ jobs:
       - name: Render submit-enabled runtime config
         run: python scripts/render_config.py --template config_template.ini --output config.ini --enable-ai --submit
 
-      - name: Process first three chapters serially
-        run: python scripts/three_chapter_automation.py --config config.ini
+      - name: Process selected chapters serially
+        run: >
+          python scripts/three_chapter_automation.py
+          --config config.ini
+          --chapter-selection "${{ inputs.chapter_selection }}"
 
       - name: Remove runtime credentials and logs
         if: always()

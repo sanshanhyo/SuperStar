@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Process at most the first three chapters of one fixed course, serially."""
+"""Process at most three selected or unfinished chapters of one fixed course."""
 
 from __future__ import annotations
 
 import argparse
 import configparser
+import re
 import sys
 from pathlib import Path
 
@@ -55,6 +56,51 @@ def find_target_course(chaoxing: Chaoxing) -> dict:
     return course
 
 
+def select_chapters(
+    points: list[dict],
+    raw_selection: str,
+) -> list[tuple[int, dict]]:
+    """Select chapters by 1-based course order or take the first unfinished ones."""
+    raw_selection = raw_selection.strip()
+
+    if not raw_selection:
+        return [
+            (index, point)
+            for index, point in enumerate(points, start=1)
+            if not point.get("has_finished", False)
+        ][:MAX_CHAPTERS]
+
+    try:
+        indices = [
+            int(item)
+            for item in re.split(r"[,，\s]+", raw_selection)
+            if item.strip()
+        ]
+    except ValueError as exc:
+        raise RuntimeError(
+            "chapter-selection 必须是章节顺序号，例如 4,5,6，"
+            f"实际为 {raw_selection!r}"
+        ) from exc
+
+    if not indices:
+        raise RuntimeError("chapter-selection 不能为空白字符")
+    if len(indices) > MAX_CHAPTERS:
+        raise RuntimeError(
+            f"chapter-selection 最多选择 {MAX_CHAPTERS} 个章节"
+        )
+    if len(set(indices)) != len(indices):
+        raise RuntimeError("chapter-selection 中不能有重复章节")
+
+    selected = []
+    for index in indices:
+        if index < 1 or index > len(points):
+            raise RuntimeError(
+                f"章节顺序号超出范围：{index}，当前课程共有 {len(points)} 个章节"
+            )
+        selected.append((index, points[index - 1]))
+    return selected
+
+
 def run_video(chaoxing: Chaoxing, course: dict, job: dict, job_info: dict) -> None:
     result = chaoxing.study_video(
         course,
@@ -85,6 +131,11 @@ def run_video(chaoxing: Chaoxing, course: dict, job: dict, job_info: dict) -> No
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument(
+        "--chapter-selection",
+        default="",
+        help="章节顺序号，例如 4,5,6；留空则自动选择前三个未完成章节",
+    )
     args = parser.parse_args()
 
     configure_console_logger("DEBUG")
@@ -148,20 +199,29 @@ def main() -> int:
         course.get("cpi", ""),
     )
     points = point_data.get("points") if isinstance(point_data, dict) else None
-    if not isinstance(points, list) or len(points) < MAX_CHAPTERS:
+    if not isinstance(points, list) or not points:
         raise RuntimeError(
-            f"expected at least {MAX_CHAPTERS} chapter points, got "
+            "expected at least one chapter point, got "
             f"{len(points) if isinstance(points, list) else 'invalid response'}"
         )
+
+    selected_chapters = select_chapters(points, args.chapter_selection)
+    if not selected_chapters:
+        logger.info("[three-chapter] no unfinished chapters selected; nothing to do")
 
     processed_chapters = 0
     skipped_chapters = 0
     processed_tasks = 0
-    for chapter_index, point in enumerate(points[:MAX_CHAPTERS], start=1):
+    for selected_index, (chapter_index, point) in enumerate(
+        selected_chapters,
+        start=1,
+    ):
         logger.info(
-            "[three-chapter] chapter {}/{}: id={} title={!r} finished={} jobCount={}",
+            "[three-chapter] selected chapter {}/{} (course order {}): "
+            "id={} title={!r} finished={} jobCount={}",
+            selected_index,
+            len(selected_chapters),
             chapter_index,
-            MAX_CHAPTERS,
             point.get("id"),
             point.get("title", ""),
             point.get("has_finished", False),
@@ -189,9 +249,11 @@ def main() -> int:
         for job_index, job in enumerate(jobs, start=1):
             job_type = job.get("type")
             logger.info(
-                "[three-chapter] chapter {}/{} task {}/{}: type={} jobId={}",
+                "[three-chapter] selected chapter {}/{} (course order {}) "
+                "task {}/{}: type={} jobId={}",
+                selected_index,
+                len(selected_chapters),
                 chapter_index,
-                MAX_CHAPTERS,
                 job_index,
                 len(jobs),
                 job_type,
