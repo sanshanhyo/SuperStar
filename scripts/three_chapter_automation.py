@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import math
 import re
 import sys
 from pathlib import Path
@@ -21,6 +22,8 @@ from api.logger import configure_console_logger, logger
 COURSE_ID = "266120241"
 CLAZZ_ID = "152038953"
 MAX_CHAPTERS = 3
+MIN_VIDEO_SPEED = 1.0
+MAX_VIDEO_SPEED = 2.0
 
 
 def read_config(path: Path) -> configparser.ConfigParser:
@@ -101,12 +104,18 @@ def select_chapters(
     return selected
 
 
-def run_video(chaoxing: Chaoxing, course: dict, job: dict, job_info: dict) -> None:
+def run_video(
+    chaoxing: Chaoxing,
+    course: dict,
+    job: dict,
+    job_info: dict,
+    video_speed: float,
+) -> None:
     result = chaoxing.study_video(
         course,
         job,
         job_info,
-        _speed=1.0,
+        _speed=video_speed,
         _type="Video",
     )
     if result.is_success():
@@ -119,7 +128,7 @@ def run_video(chaoxing: Chaoxing, course: dict, job: dict, job_info: dict) -> No
         course,
         job,
         job_info,
-        _speed=1.0,
+        _speed=video_speed,
         _type="Audio",
     )
     if not result.is_success():
@@ -142,6 +151,17 @@ def main() -> int:
     config = read_config(args.config)
     common = config["common"]
     tiku_config = dict(config["tiku"])
+    try:
+        video_speed = float(common.get("speed", MIN_VIDEO_SPEED))
+    except ValueError as exc:
+        raise RuntimeError("config.ini contains an invalid video speed") from exc
+    if (
+        not math.isfinite(video_speed)
+        or not MIN_VIDEO_SPEED <= video_speed <= MAX_VIDEO_SPEED
+    ):
+        raise RuntimeError(
+            f"video speed must be between {MIN_VIDEO_SPEED} and {MAX_VIDEO_SPEED}"
+        )
     username = common.get("username", "").strip()
     password = common.get("password", "")
     configured_courses = [
@@ -162,10 +182,12 @@ def main() -> int:
         raise RuntimeError("three-chapter automation requires submit=true")
 
     logger.info(
-        "[three-chapter] scope locked to courseId={} clazzId={}, max_chapters={}",
+        "[three-chapter] scope locked to courseId={} clazzId={}, "
+        "max_chapters={}, video_speed={}x",
         COURSE_ID,
         CLAZZ_ID,
         MAX_CHAPTERS,
+        video_speed,
     )
     logger.warning(
         "[three-chapter] state-changing run: videos and quiz submissions are enabled; "
@@ -260,7 +282,7 @@ def main() -> int:
                 job.get("jobid", ""),
             )
             if job_type == "video":
-                run_video(chaoxing, course, job, job_info)
+                run_video(chaoxing, course, job, job_info, video_speed)
             elif job_type == "workid":
                 result = chaoxing.study_work(course, job, job_info)
                 if not result.is_success():

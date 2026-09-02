@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import math
 import os
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from pathlib import Path
 COURSE_ID = "266120241"
 DEFAULT_TIKU_API_ENDPOINT = "https://api.shenwenai.com/v1"
 DEFAULT_TIKU_API_MODEL = "gpt-5.6-luna"
+MIN_VIDEO_SPEED = 1.0
+MAX_VIDEO_SPEED = 2.0
 
 
 def required_secret(name: str) -> str:
@@ -37,9 +40,22 @@ def main() -> None:
         action="store_true",
         help="enable real quiz submission; only use for an explicit submit test",
     )
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=MIN_VIDEO_SPEED,
+        help="video speed from 1.0 to 2.0",
+    )
     args = parser.parse_args()
     if args.submit and not args.enable_ai:
         raise SystemExit("--submit requires --enable-ai")
+    if (
+        not math.isfinite(args.speed)
+        or not MIN_VIDEO_SPEED <= args.speed <= MAX_VIDEO_SPEED
+    ):
+        raise SystemExit(
+            f"--speed must be between {MIN_VIDEO_SPEED} and {MAX_VIDEO_SPEED}"
+        )
 
     username = required_secret("CHAOXING_USERNAME")
     password = required_secret("CHAOXING_PASSWORD")
@@ -57,7 +73,7 @@ def main() -> None:
     common["password"] = password
     # This is deliberately fixed so a manual run cannot broaden the scope.
     common["course_list"] = COURSE_ID
-    common["speed"] = "1"
+    common["speed"] = f"{args.speed:g}"
     common["jobs"] = "1"
     common["notopen_action"] = "continue"
 

@@ -8,6 +8,11 @@ on:
         required: false
         default: ""
         type: string
+      video_speed:
+        description: "视频倍速，允许范围 1.0 到 2.0"
+        required: true
+        default: "1.0"
+        type: string
 
 permissions:
   contents: read
@@ -42,7 +47,13 @@ jobs:
           test -n "$TIKU_API_KEY" || { echo "TIKU_API_KEY is not configured"; exit 1; }
 
       - name: Render submit-enabled runtime config
-        run: python scripts/render_config.py --template config_template.ini --output config.ini --enable-ai --submit
+        run: >
+          python scripts/render_config.py
+          --template config_template.ini
+          --output config.ini
+          --enable-ai
+          --submit
+          --speed "${{ inputs.video_speed }}"
 
       - name: Process selected chapters serially
         run: >
