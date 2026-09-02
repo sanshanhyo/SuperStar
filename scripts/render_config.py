@@ -10,6 +10,8 @@ from pathlib import Path
 
 
 COURSE_ID = "266120241"
+DEFAULT_TIKU_API_ENDPOINT = "https://api.shenwenai.com/v1"
+DEFAULT_TIKU_API_MODEL = "gpt-5.6-luna"
 
 
 def required_secret(name: str) -> str:
@@ -25,6 +27,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--enable-ai",
+        action="store_true",
+        help="configure the OpenAI-compatible answer provider",
+    )
     args = parser.parse_args()
 
     username = required_secret("CHAOXING_USERNAME")
@@ -46,6 +53,26 @@ def main() -> None:
     common["speed"] = "1"
     common["jobs"] = "1"
     common["notopen_action"] = "continue"
+
+    if args.enable_ai:
+        api_key = required_secret("TIKU_API_KEY")
+        api_endpoint = os.environ.get(
+            "TIKU_API_ENDPOINT", DEFAULT_TIKU_API_ENDPOINT
+        ).rstrip("/")
+        if not api_endpoint.endswith("/v1"):
+            api_endpoint += "/v1"
+        api_model = os.environ.get("TIKU_API_MODEL", DEFAULT_TIKU_API_MODEL)
+        if not config.has_section("tiku"):
+            raise SystemExit("config template is missing [tiku]")
+        tiku = config["tiku"]
+        tiku["provider"] = "AI"
+        tiku["endpoint"] = api_endpoint
+        tiku["key"] = api_key
+        tiku["model"] = api_model
+        tiku["check_llm_connection"] = "true"
+        # The first answer test is deliberately save-only.
+        tiku["submit"] = "false"
+        tiku["min_interval_seconds"] = "3"
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", encoding="utf-8") as config_file:

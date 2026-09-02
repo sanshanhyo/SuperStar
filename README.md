@@ -54,6 +54,13 @@
 但不会调用答题、作业、签到或提交逻辑。成功日志为
 `[video-test] SUCCESS: one video task completed`。
 
+## 答题 API 保存测试
+
+`SuperStar answer dry-run` 是独立的手动 workflow，使用 `TIKU_API_KEY`、
+`https://api.shenwenai.com/v1` 和 `gpt-5.6-luna`，固定检查同一章节中的一个测验任务。
+它会先检查 API 连通性，再以 `submit=false` 运行一次答题流程，只保存草稿，不提交测验。
+成功日志为 `[answer-test] SUCCESS: one quiz answered in submit=false mode`。
+
 ## 赞助
 >如果觉着代码对你有帮助，可以赞赏一下开发者
 
