@@ -59,7 +59,7 @@
 uv run --with PyNaCl python scripts/account_payload.py generate-key
 ```
 
-将 `superstar-account-private-key.txt` 的内容保存为仓库 Secret `SUPERSTAR_ACCOUNT_PRIVATE_KEY`。私钥只保存到 Secret 和你自己的本地安全位置，不要提交；公钥文件也只在本地使用即可。
+运行生成命令后，工具会自动把私钥复制到 macOS 剪贴板。直接将其粘贴为仓库 Secret `SUPERSTAR_ACCOUNT_PRIVATE_KEY` 即可；如果当前系统不支持自动复制，再手动复制 `superstar-account-private-key.txt` 的内容。私钥只保存到 Secret 和你自己的本地安全位置，不要提交；公钥文件也只在本地使用即可。
 
 以后新增账号时，在仓库目录运行：
 

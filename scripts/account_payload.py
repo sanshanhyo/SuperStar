@@ -10,7 +10,9 @@ import getpass
 import json
 import os
 import re
+import shutil
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -90,11 +92,37 @@ def prompt_value(label: str, default: str = "") -> str:
     return value or default
 
 
+def copy_to_clipboard(value: str) -> bool:
+    """Copy sensitive output when a supported local clipboard command exists."""
+    command = next(
+        (candidate for candidate in ("pbcopy", "wl-copy", "xclip") if shutil.which(candidate)),
+        None,
+    )
+    if command is None:
+        return False
+    try:
+        arguments = [command]
+        if command == "xclip":
+            arguments.extend(["-selection", "clipboard"])
+        subprocess.run(
+            arguments,
+            input=value,
+            text=True,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
+
+
 def generate_key(private_path: Path, public_path: Path) -> None:
     if private_path.exists() or public_path.exists():
         raise ValueError("密钥文件已存在；如需重新生成请先手动移走旧文件")
     private_key = PrivateKey.generate()
-    private_path.write_text(encode_key(bytes(private_key)), encoding="ascii")
+    private_value = encode_key(bytes(private_key))
+    private_path.write_text(private_value, encoding="ascii")
     public_path.write_text(
         encode_key(bytes(private_key.public_key)),
         encoding="ascii",
@@ -102,7 +130,11 @@ def generate_key(private_path: Path, public_path: Path) -> None:
     private_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
     print(f"已生成私钥文件: {private_path}")
     print(f"已生成公钥文件: {public_path}")
-    print("请将私钥文件内容保存为 GitHub Secret: SUPERSTAR_ACCOUNT_PRIVATE_KEY")
+    if copy_to_clipboard(private_value):
+        print("私钥内容已自动复制到剪贴板，可直接粘贴到 GitHub Secret")
+    else:
+        print("未检测到可用剪贴板，请手动复制私钥文件内容")
+    print("GitHub Secret 名称: SUPERSTAR_ACCOUNT_PRIVATE_KEY")
     print("私钥不要提交到仓库；公钥只用于本地生成密文")
 
 
