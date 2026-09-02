@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Answer one quiz in save-only mode using an OpenAI-compatible provider."""
+"""Answer one quiz using an OpenAI-compatible provider."""
 
 from __future__ import annotations
 
@@ -59,6 +59,11 @@ def find_target_course(chaoxing: Chaoxing) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument(
+        "--allow-submit",
+        action="store_true",
+        help="explicitly allow the configured quiz submission",
+    )
     args = parser.parse_args()
 
     configure_console_logger("DEBUG")
@@ -81,8 +86,11 @@ def main() -> int:
         )
     if tiku_config.get("provider") != "AI":
         raise RuntimeError("answer test requires provider=AI")
-    if tiku_config.get("submit", "true").strip().lower() != "false":
-        raise RuntimeError("answer test is save-only and requires submit=false")
+    submit_enabled = tiku_config.get("submit", "false").strip().lower() == "true"
+    if submit_enabled and not args.allow_submit:
+        raise RuntimeError(
+            "submit=true requires the explicit --allow-submit switch"
+        )
 
     logger.info(
         "[answer-test] scope locked to courseId={} clazzId={} pointId={} title={!r}",
@@ -92,8 +100,13 @@ def main() -> int:
         POINT_TITLE,
     )
     logger.info(
-        "[answer-test] submit=false: answers may be saved as a draft, "
-        "but the quiz will not be submitted"
+        "[answer-test] submit={}: {}",
+        str(submit_enabled).lower(),
+        (
+            "this run may submit one quiz"
+            if submit_enabled
+            else "answers may be saved as a draft, but the quiz will not be submitted"
+        ),
     )
     logger.info(
         "[answer-test] provider=AI endpoint={} model={}",
@@ -165,7 +178,10 @@ def main() -> int:
     if not result.is_success():
         raise RuntimeError(f"save-only answer task failed with result={result.name}")
 
-    logger.info("[answer-test] SUCCESS: one quiz answered in submit=false mode")
+    logger.info(
+        "[answer-test] SUCCESS: one quiz answered in submit={} mode",
+        str(submit_enabled).lower(),
+    )
     return 0
 
 

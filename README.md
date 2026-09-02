@@ -61,6 +61,9 @@
 它会先检查 API 连通性，再以 `submit=false` 运行一次答题流程，只保存草稿，不提交测验。
 成功日志为 `[answer-test] SUCCESS: one quiz answered in submit=false mode`。
 
+另有 `SuperStar answer submit test`，只有手动触发，并通过显式 `--allow-submit` 才会提交。
+它目前仍固定为同一章节中的一个测验，用于验证真实提交链路，不代表已经开启整门课自动化。
+
 ## 赞助
 >如果觉着代码对你有帮助，可以赞赏一下开发者
 

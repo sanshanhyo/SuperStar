@@ -32,7 +32,14 @@ def main() -> None:
         action="store_true",
         help="configure the OpenAI-compatible answer provider",
     )
+    parser.add_argument(
+        "--submit",
+        action="store_true",
+        help="enable real quiz submission; only use for an explicit submit test",
+    )
     args = parser.parse_args()
+    if args.submit and not args.enable_ai:
+        raise SystemExit("--submit requires --enable-ai")
 
     username = required_secret("CHAOXING_USERNAME")
     password = required_secret("CHAOXING_PASSWORD")
@@ -70,8 +77,7 @@ def main() -> None:
         tiku["key"] = api_key
         tiku["model"] = api_model
         tiku["check_llm_connection"] = "true"
-        # The first answer test is deliberately save-only.
-        tiku["submit"] = "false"
+        tiku["submit"] = "true" if args.submit else "false"
         tiku["min_interval_seconds"] = "3"
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
